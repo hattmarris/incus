@@ -23,14 +23,61 @@ defmodule Incus.Instances do
       ...>     architecture: :armv7l
       ...>   }
       ...> })
-      {:ok, %{"class" => "task", "description" => "Creating instance", ...}}
+      {:ok, %{"class" => "task", "description" => "Creating instance" }}
   """
+  @spec post(map, list) :: Incus.resp_t()
   def post(body, opts \\ []) do
     endpoint = %Endpoint{method: "POST", version: "1.0", path: "/instances"}
 
     opts
     |> Incus.new()
     |> Req.post(url: endpoint.path, body: Jason.encode!(body))
+    |> Incus.handle(endpoint, opts)
+  end
+
+  @doc """
+  PUT /1.0/instances/{name}/state
+
+  Changes the running state of the instance.
+
+  ## Examples
+
+      iex> Incus.Instances.put_state(:runner, %{
+        action: "start",
+        timeout: 0,
+        force: false,
+        stateful: false
+      })
+      {:ok, %{ "class" => "task", "description" => "Starting instance" }}
+  """
+  @spec put_state(atom | String.t(), map, list) :: Incus.resp_t()
+  def put_state(name, body, opts \\ []) do
+    endpoint = %Endpoint{method: "PUT", version: "1.0", path: "/instances/#{name}/state"}
+
+    opts
+    |> Incus.new()
+    |> Req.put(url: endpoint.path, body: Jason.encode!(body))
+    |> Incus.handle(endpoint, opts)
+  end
+
+  @doc """
+  DELETE /1.0/instances/{name}
+
+  Deletes a specific instance.
+
+  This also deletes anything owned by the instance such as snapshots and backups.
+
+  ## Examples
+
+      iex> Incus.Instances.delete(:runner)
+      {:ok, %{ "class" => "task", "description" => "Deleting instance" }}
+  """
+  def delete(name, opts \\ []) do
+    endpoint = %Endpoint{method: "DELETE", version: "1.0", path: "/instances/#{name}"}
+
+    opts
+    |> Incus.new()
+    |> Req.delete(url: endpoint.path)
     |> Incus.handle(endpoint, opts)
   end
 end
