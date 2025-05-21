@@ -2,6 +2,36 @@ defmodule Incus.Instances do
   alias Incus.Endpoint
 
   @doc """
+  GET /1.0/instances
+
+  Returns a list of instances (URLs).
+
+  ## Examples
+
+      iex> Incus.Instances.get()
+      {:ok, ["/1.0/instances/a1"]}
+
+      iex> Incus.Instances.get(recursion: 1)
+      {:ok, [%{"architecture" => "x86_64", "Status" => "Running", "type" => "container"}]}
+  """
+  @spec get(list) :: Incus.resp_t()
+  def get(opts \\ []) do
+    endpoint = %Endpoint{method: "GET", version: "1.0", path: "/instances"}
+
+    params =
+      opts
+      |> Enum.reduce(%{}, fn
+        {:recursion, n}, acc -> Map.put(acc, :recursion, n)
+        _, acc -> acc
+      end)
+
+    opts
+    |> Incus.new()
+    |> Req.get(url: endpoint.path, params: params)
+    |> Incus.handle(endpoint, opts)
+  end
+
+  @doc """
   POST /1.0/instances
 
   Creates a new instance
@@ -72,6 +102,7 @@ defmodule Incus.Instances do
       iex> Incus.Instances.delete(:runner)
       {:ok, %{ "class" => "task", "description" => "Deleting instance" }}
   """
+  @spec delete(atom | String.t(), list) :: Incus.resp_t()
   def delete(name, opts \\ []) do
     endpoint = %Endpoint{method: "DELETE", version: "1.0", path: "/instances/#{name}"}
 

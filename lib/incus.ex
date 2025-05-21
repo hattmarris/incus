@@ -74,6 +74,35 @@ defmodule Incus do
     "#{method} #{ver_path(endpoint)}"
   end
 
+  def list() do
+    case Instances.get(recursion: 2) do
+      {:ok, list} ->
+        Enum.map(list, fn map ->
+          out =
+            map
+            |> Map.take(["name", "status", "type", "snapshots"])
+
+          case map do
+            %{"state" => %{"status_code" => 102}} ->
+              out
+
+            %{"state" => %{"status_code" => 103}} ->
+              ipv4 =
+                map
+                |> get_in(["state", "network", "eth0", "addresses"])
+                |> Enum.find_value(&if &1["family"] == "inet", do: &1["address"])
+
+              ipv6 =
+                map
+                |> get_in(["state", "network", "eth0", "addresses"])
+                |> Enum.find_value(&if &1["family"] == "inet6", do: &1["address"])
+
+              Map.merge(out, %{"ipv4" => ipv4, "ipv6" => ipv6})
+          end
+        end)
+    end
+  end
+
   @doc """
   Create and start instances from images
 
