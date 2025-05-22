@@ -14,6 +14,6 @@ defmodule Incus.Log do
     msg
   end
 
-  defp format(msg) when is_map(msg), do: inspect(msg)
+  defp format(msg) when is_map(msg) or is_tuple(msg) or is_list(msg), do: inspect(msg)
   defp format(msg), do: msg
 end

@@ -12,7 +12,8 @@ defmodule Incus.MixProject do
 
   defp deps do
     [
-      {:req, "~> 0.5.6"}
+      {:req, "~> 0.5.6"},
+      {:websockex, "~> 0.4.3"}
     ]
   end
 end

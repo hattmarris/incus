@@ -43,6 +43,7 @@ defmodule Incus do
   @type resp_t :: {:ok, Req.Response.t() | map} | {:error, Req.Response.t() | String.t()}
   @spec handle(tuple, Endpoint.t(), list) :: resp_t
   def handle(resp_tuple, %Endpoint{} = endpoint, opts \\ []) do
+    Log.debug(resp_tuple)
     resp? = Keyword.get(opts, :response, false)
 
     case resp_tuple do
@@ -160,6 +161,31 @@ defmodule Incus do
       :ok -> start(name)
       :error -> :error
     end
+  end
+
+  def exec(name, cmd_str) do
+    command =
+      cmd_str
+      |> String.split(" ")
+      |> Enum.map(&String.trim(&1))
+      |> Log.debug()
+
+    body =
+      %{
+        "command" => command,
+        "wait-for-websocket" => true,
+        "interactive" => true,
+        "environment" => %{
+          "TERM" => "xterm-256color"
+        },
+        "width" => 102,
+        "height" => 54,
+        "user" => 0,
+        "group" => 0,
+        "cwd" => ""
+      }
+
+    Instances.exec(name, body)
   end
 
   def start(name) do

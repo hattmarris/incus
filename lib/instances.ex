@@ -1,5 +1,7 @@
 defmodule Incus.Instances do
   alias Incus.Endpoint
+  alias Incus.Websocket
+  alias Incus.Log
 
   @doc """
   GET /1.0/instances
@@ -63,6 +65,91 @@ defmodule Incus.Instances do
     |> Incus.new()
     |> Req.post(url: endpoint.path, body: Jason.encode!(body))
     |> Incus.handle(endpoint, opts)
+  end
+
+  @doc """
+  POST /1.0/instances/{name}/exec
+
+  Executes a command inside an instance.
+
+  The returned operation metadata will contain either 2 or 4 websockets.
+  In non-interactive mode, you'll get one websocket for each of stdin, stdout and stderr.
+  In interactive mode, a single bi-directional websocket is used for stdin and stdout/stderr.
+
+  An additional "control" socket is always added on top which can be used for out of band communications.
+  This allows sending signals and window sizing information through.
+  """
+  def exec(name, body, opts \\ []) do
+    endpoint = %Endpoint{method: "POST", version: "1.0", path: "/instances/#{name}/exec"}
+
+    {main, control} =
+      case opts
+           |> Incus.new()
+           |> Req.post(url: endpoint.path, body: Jason.encode!(body))
+           |> Incus.handle(endpoint, opts) do
+        {:ok,
+         %{
+           "id" => id,
+           "metadata" => %{
+             "fds" => %{"0" => main, "control" => control}
+           }
+         }} ->
+          {Websocket.url(id, main), Websocket.url(id, control)}
+      end
+
+    ctrl_task =
+      Task.async(fn ->
+        Websocket.start(control, :control, self())
+        listen()
+      end)
+
+    main_task =
+      Task.async(fn ->
+        Websocket.start(main, :main, self())
+        listen()
+      end)
+
+    ctrl_buff =
+      case Task.yield(ctrl_task, 5000) || Task.shutdown(ctrl_task, :brutal_kill) do
+        {:ok, {:ok, buffer}} -> buffer
+        nil -> :error
+      end
+
+    main_buff =
+      case Task.yield(main_task, 5000) || Task.shutdown(main_task, :brutal_kill) do
+        {:ok, {:ok, buffer}} -> buffer
+        nil -> :error
+      end
+
+    {:ok, ctrl_buff, main_buff}
+  end
+
+  def listen(timeout \\ 5000) do
+    receive do
+      {:data, data} ->
+        data
+        |> String.split("\n")
+        |> Enum.map(fn
+          "" -> nil
+          "" <> str -> Log.info(str)
+          other -> Log.error(other)
+        end)
+
+        listen()
+
+      {:connected, _conn} ->
+        listen()
+
+      {:disconnected, buffer} ->
+        {:ok, buffer}
+
+      other ->
+        Log.debug("Unexpected message received #{inspect(other)}")
+        {:error, other}
+    after
+      timeout ->
+        {:error, :timeout}
+    end
   end
 
   @doc """
