@@ -97,26 +97,28 @@ defmodule Incus.Instances do
           {Websocket.url(id, main), Websocket.url(id, control)}
       end
 
+    timeout = Keyword.get(opts, :timeout, 60000)
+
     ctrl_task =
       Task.async(fn ->
         Websocket.start(control, :control, self())
-        listen()
+        listen(timeout)
       end)
 
     main_task =
       Task.async(fn ->
         Websocket.start(main, :main, self())
-        listen()
+        listen(timeout)
       end)
 
     ctrl_buff =
-      case Task.yield(ctrl_task, 5000) || Task.shutdown(ctrl_task, :brutal_kill) do
+      case Task.yield(ctrl_task, timeout) || Task.shutdown(ctrl_task, :brutal_kill) do
         {:ok, {:ok, buffer}} -> buffer
         nil -> :error
       end
 
     main_buff =
-      case Task.yield(main_task, 5000) || Task.shutdown(main_task, :brutal_kill) do
+      case Task.yield(main_task, timeout) || Task.shutdown(main_task, :brutal_kill) do
         {:ok, {:ok, buffer}} -> buffer
         nil -> :error
       end
@@ -124,7 +126,7 @@ defmodule Incus.Instances do
     {:ok, ctrl_buff, main_buff}
   end
 
-  def listen(timeout \\ 5000) do
+  def listen(timeout) do
     receive do
       {:data, data} ->
         data
@@ -135,10 +137,10 @@ defmodule Incus.Instances do
           other -> Log.error(other)
         end)
 
-        listen()
+        listen(timeout)
 
       {:connected, _conn} ->
-        listen()
+        listen(timeout)
 
       {:disconnected, buffer} ->
         {:ok, buffer}
@@ -148,6 +150,7 @@ defmodule Incus.Instances do
         {:error, other}
     after
       timeout ->
+        Log.error("Longer than #{timeout} with no message from Incus.Websocket")
         {:error, :timeout}
     end
   end
