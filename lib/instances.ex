@@ -1,7 +1,6 @@
 defmodule Incus.Instances do
   alias Incus.Endpoint
   alias Incus.Websocket
-  alias Incus.Log
 
   @doc """
   GET /1.0/instances
@@ -99,60 +98,32 @@ defmodule Incus.Instances do
 
     timeout = Keyword.get(opts, :timeout, 60000)
 
-    ctrl_task =
-      Task.async(fn ->
-        Websocket.start(control, :control, self())
-        listen(timeout)
-      end)
+    IO.inspect("Module process - #{self() |> :erlang.pid_to_list() |> to_string}")
 
-    main_task =
-      Task.async(fn ->
-        Websocket.start(main, :main, self())
-        listen(timeout)
-      end)
+    ctrl_task = Websocket.task(control, :control, timeout)
+    main_task = Websocket.task(main, :main, timeout)
 
     ctrl_buff =
       case Task.yield(ctrl_task, timeout) || Task.shutdown(ctrl_task, :brutal_kill) do
-        {:ok, {:ok, buffer}} -> buffer
-        nil -> :error
+        {:ok, {:ok, buffer}} ->
+          Task.shutdown(ctrl_task, 1000) |> IO.inspect()
+          buffer
+
+        nil ->
+          :error
       end
 
     main_buff =
       case Task.yield(main_task, timeout) || Task.shutdown(main_task, :brutal_kill) do
-        {:ok, {:ok, buffer}} -> buffer
-        nil -> :error
+        {:ok, {:ok, buffer}} ->
+          Task.shutdown(main_task, 1000) |> IO.inspect()
+          buffer
+
+        nil ->
+          :error
       end
 
     {:ok, ctrl_buff, main_buff}
-  end
-
-  def listen(timeout) do
-    receive do
-      {:data, data} ->
-        data
-        |> String.split("\n")
-        |> Enum.map(fn
-          "" -> nil
-          "" <> str -> Log.info(str)
-          other -> Log.error(other)
-        end)
-
-        listen(timeout)
-
-      {:connected, _conn} ->
-        listen(timeout)
-
-      {:disconnected, buffer} ->
-        {:ok, buffer}
-
-      other ->
-        Log.debug("Unexpected message received #{inspect(other)}")
-        {:error, other}
-    after
-      timeout ->
-        Log.error("Longer than #{timeout} with no message from Incus.Websocket")
-        {:error, :timeout}
-    end
   end
 
   @doc """
