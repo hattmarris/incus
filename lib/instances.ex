@@ -98,15 +98,13 @@ defmodule Incus.Instances do
 
     timeout = Keyword.get(opts, :timeout, 60000)
 
-    IO.inspect("Module process - #{self() |> :erlang.pid_to_list() |> to_string}")
-
     ctrl_task = Websocket.task(control, :control, timeout)
     main_task = Websocket.task(main, :main, timeout)
 
     ctrl_buff =
       case Task.yield(ctrl_task, timeout) || Task.shutdown(ctrl_task, :brutal_kill) do
         {:ok, {:ok, buffer}} ->
-          Task.shutdown(ctrl_task, 1000) |> IO.inspect()
+          Task.shutdown(ctrl_task, 1000)
           buffer
 
         nil ->
@@ -116,7 +114,7 @@ defmodule Incus.Instances do
     main_buff =
       case Task.yield(main_task, timeout) || Task.shutdown(main_task, :brutal_kill) do
         {:ok, {:ok, buffer}} ->
-          Task.shutdown(main_task, 1000) |> IO.inspect()
+          Task.shutdown(main_task, 1000)
           buffer
 
         nil ->

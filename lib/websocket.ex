@@ -12,7 +12,6 @@ defmodule Incus.Websocket do
       start(url, name, self())
       listen(timeout)
     end)
-    |> IO.inspect()
   end
 
   def listen(timeout) do
