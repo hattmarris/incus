@@ -197,4 +197,17 @@ defmodule Incus.Instances do
     |> Req.get(url: endpoint.path, params: params)
     |> Incus.handle(endpoint, opts)
   end
+
+  def head_files(name, instance_path, opts \\ []) do
+    endpoint = %Endpoint{method: "HEAD", version: "1.0", path: "/instances/#{name}/files"}
+
+    params = %{
+      path: instance_path
+    }
+
+    opts
+    |> Incus.new()
+    |> Req.get(url: endpoint.path, params: params)
+    |> Incus.handle(endpoint, opts)
+  end
 end

@@ -200,15 +200,47 @@ defmodule Incus do
     end
   end
 
-  defp recursive_file_pull(_name, _instance_path, _local_path, _opts) do
-    # TODO: implement
+  defp recursive_file_pull(name, i_dir, dir, opts) do
+    opts = Keyword.merge(opts, response: true)
+
+    files =
+      case Incus.Instances.get_files(name, i_dir, opts) do
+        {:ok, %Req.Response{headers: %{"x-incus-type" => ["directory"]}, body: body}} ->
+          body["metadata"]
+      end
+
+    results =
+      Enum.reduce(files, [], fn file, acc ->
+        path = Path.join([dir, file])
+        i_path = Path.join([i_dir, file])
+
+        case Incus.Instances.head_files(name, i_path, opts) do
+          {:ok, %Req.Response{headers: %{"x-incus-type" => ["file"]}}} ->
+            resp =
+              single_file_pull(name, i_path, path, opts)
+
+            acc ++ [{:file, file, resp}]
+
+          {:ok, %Req.Response{headers: %{"x-incus-type" => ["directory"]}}} ->
+            {:ok, res} = recursive_file_pull(name, i_path, path, opts)
+            acc ++ [{:dir, file, res}]
+        end
+      end)
+
+    {:ok, results}
   end
 
   defp single_file_pull(name, instance_path, local_path, opts) do
     opts = Keyword.merge(opts, response: true)
 
+    Log.info("Pulling #{instance_path} to #{local_path}")
+
     case Incus.Instances.get_files(name, instance_path, opts) do
       {:ok, %Req.Response{headers: %{"x-incus-type" => ["file"]}, body: file}} ->
+        local_path
+        |> Path.dirname()
+        |> File.mkdir_p!()
+
         File.write!(local_path, file)
     end
   end
