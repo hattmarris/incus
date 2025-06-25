@@ -149,9 +149,11 @@ defmodule Incus do
     {:ok, %{"id" => id}} =
       %{
         name: name,
+        config: Keyword.get(opts, :config),
         source: source,
         type: Keyword.get(opts, :type, :container)
       }
+      |> Map.reject(fn {_k, v} -> is_nil(v) end)
       |> Log.debug()
       |> Instances.post(opts)
 
@@ -163,7 +165,7 @@ defmodule Incus do
     end
   end
 
-  def exec(name, cmd_str) do
+  def exec(name, cmd_str, opts \\ []) do
     command =
       cmd_str
       |> String.split(" ")
@@ -182,10 +184,76 @@ defmodule Incus do
         "height" => 54,
         "user" => 0,
         "group" => 0,
-        "cwd" => ""
+        "cwd" => Keyword.get(opts, :cwd, "")
       }
 
     Instances.exec(name, body)
+  end
+
+  def file_pull(name, instance_path, local_path, opts \\ []) do
+    recursive = Keyword.get(opts, :r, false)
+
+    if recursive do
+      recursive_file_pull(name, instance_path, local_path, opts)
+    else
+      single_file_pull(name, instance_path, local_path, opts)
+    end
+  end
+
+  defp recursive_file_pull(_name, _instance_path, _local_path, _opts) do
+    # TODO: implement
+  end
+
+  defp single_file_pull(name, instance_path, local_path, opts) do
+    opts = Keyword.merge(opts, response: true)
+
+    case Incus.Instances.get_files(name, instance_path, opts) do
+      {:ok, %Req.Response{headers: %{"x-incus-type" => ["file"]}, body: file}} ->
+        File.write!(local_path, file)
+    end
+  end
+
+  def file_push(name, local_path, instance_path, opts \\ []) do
+    recursive = Keyword.get(opts, :r, false)
+
+    if recursive do
+      recursive_file_push(name, local_path, instance_path, opts)
+    else
+      single_file_push(name, local_path, instance_path, opts)
+    end
+  end
+
+  defp recursive_file_push(name, dir, i_dir, opts) do
+    {:ok, _, _} = exec(name, "mkdir -p #{i_dir}")
+    files = File.ls!(dir)
+
+    results =
+      Enum.reduce(files, [], fn file, acc ->
+        path = Path.join([dir, file])
+        i_path = Path.join([i_dir, file])
+
+        case File.lstat!(path) do
+          %File.Stat{type: :regular} ->
+            resp =
+              single_file_push(name, path, i_path, opts)
+
+            acc ++ [{:file, file, resp}]
+
+          %File.Stat{type: :directory} ->
+            {:ok, res} = recursive_file_push(name, path, i_path, opts)
+            acc ++ [{:dir, file, res}]
+        end
+      end)
+
+    {:ok, results}
+  end
+
+  defp single_file_push(name, local_path, instance_path, opts) do
+    file = File.read!(local_path)
+
+    Log.info("Pushing #{local_path} to #{instance_path}")
+
+    Instances.post_files(name, file, instance_path, opts)
   end
 
   def start(name) do

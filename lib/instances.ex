@@ -170,4 +170,31 @@ defmodule Incus.Instances do
     |> Req.delete(url: endpoint.path)
     |> Incus.handle(endpoint, opts)
   end
+
+  @spec post_files(atom | String.t(), binary, Path.t(), list) :: Incus.resp_t()
+  def post_files(name, raw_file, instance_path, opts \\ []) do
+    endpoint = %Endpoint{method: "POST", version: "1.0", path: "/instances/#{name}/files"}
+
+    params = %{
+      path: instance_path
+    }
+
+    opts
+    |> Incus.new()
+    |> Req.post(url: endpoint.path, params: params, body: raw_file)
+    |> Incus.handle(endpoint, opts)
+  end
+
+  def get_files(name, instance_path, opts \\ []) do
+    endpoint = %Endpoint{method: "GET", version: "1.0", path: "/instances/#{name}/files"}
+
+    params = %{
+      path: instance_path
+    }
+
+    opts
+    |> Incus.new()
+    |> Req.get(url: endpoint.path, params: params)
+    |> Incus.handle(endpoint, opts)
+  end
 end
