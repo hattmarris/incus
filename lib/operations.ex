@@ -29,4 +29,12 @@ defmodule Incus.Operations do
     |> Incus.new()
     |> Req.get(url: endpoint.path, params: params)
   end
+
+  def get(id, opts \\ []) do
+    endpoint = %Endpoint{method: "GET", version: "1.0", path: "/operations/#{id}"}
+
+    opts
+    |> Incus.new()
+    |> Req.get(url: endpoint.path)
+  end
 end

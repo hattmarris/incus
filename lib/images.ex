@@ -1,6 +1,15 @@
 defmodule Incus.Images do
   alias Incus.Endpoint
 
+  def post(body, opts \\ []) do
+    endpoint = %Endpoint{method: "POST", version: "1.0", path: "/images"}
+
+    opts
+    |> Incus.new()
+    |> Req.post(url: endpoint.path, body: Jason.encode!(body))
+    |> Incus.handle(endpoint, opts)
+  end
+
   @doc """
   GET /1.0/images Get the images
 

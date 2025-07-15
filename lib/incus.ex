@@ -75,8 +75,10 @@ defmodule Incus do
     "#{method} #{ver_path(endpoint)}"
   end
 
-  def list() do
-    case Instances.get(recursion: 2) do
+  def list(opts \\ []) do
+    opts = Keyword.merge(opts, recursion: 2)
+
+    case Instances.get(opts) do
       {:ok, list} ->
         Enum.map(list, fn map ->
           out =
@@ -288,16 +290,20 @@ defmodule Incus do
     Instances.post_files(name, file, instance_path, opts)
   end
 
-  def start(name) do
+  def start(name, opts \\ []) do
     {:ok, %{"id" => id}} =
-      Instances.put_state(name, %{
-        action: "start",
-        timeout: 0,
-        force: false,
-        stateful: false
-      })
+      Instances.put_state(
+        name,
+        %{
+          action: "start",
+          timeout: 0,
+          force: false,
+          stateful: false
+        },
+        opts
+      )
 
-    case Operations.wait(id) do
+    case Operations.wait(id, opts) do
       {:ok, %Req.Response{body: %{"status_code" => 200}}} ->
         Log.info("Instance started (#{name})")
         :ok
@@ -308,16 +314,20 @@ defmodule Incus do
     end
   end
 
-  def stop(name) do
+  def stop(name, opts \\ []) do
     {:ok, %{"id" => id}} =
-      Instances.put_state(name, %{
-        action: "stop",
-        timeout: -1,
-        force: false,
-        stateful: false
-      })
+      Instances.put_state(
+        name,
+        %{
+          action: "stop",
+          timeout: -1,
+          force: false,
+          stateful: false
+        },
+        opts
+      )
 
-    case Operations.wait(id) do
+    case Operations.wait(id, opts) do
       {:ok, %Req.Response{body: %{"status_code" => 200}}} ->
         Log.info("Instance stopped (#{name})")
         :ok
@@ -354,6 +364,55 @@ defmodule Incus do
 
       {:ok, %Req.Response{body: %{"error" => error}}} ->
         Log.error("Instance creation error: #{error}")
+        :error
+    end
+  end
+
+  def publish(name, opts \\ []) do
+    alias_name = Keyword.get(opts, :alias)
+
+    # TODO: determine minimal body
+    body = %{
+      "aliases" => nil,
+      "auto_update" => false,
+      "compression_algorithm" => "",
+      "expires_at" => "0001-01-01T00:00:00Z",
+      "filename" => "",
+      "profiles" => nil,
+      "properties" => nil,
+      "public" => false,
+      "source" => %{
+        "alias" => "",
+        "certificate" => "",
+        "fingerprint" => "",
+        "image_type" => "",
+        "mode" => "",
+        "name" => name,
+        "project" => "",
+        "protocol" => "",
+        "secret" => "",
+        "server" => "",
+        "type" => "instance",
+        "url" => ""
+      }
+    }
+
+    body =
+      if alias_name do
+        Map.put(body, "aliases", [%{"description" => "", "name" => alias_name}])
+      else
+        body
+      end
+
+    {:ok, %{"id" => id}} = Incus.Images.post(body, opts)
+
+    case Operations.wait(id) do
+      {:ok, %Req.Response{body: %{"status_code" => 200, "metadata" => data}}} ->
+        Log.info("Image published with fingerprint: #{data["metadata"]["fingerprint"]}")
+        :ok
+
+      {:ok, %Req.Response{body: %{"error" => error}}} ->
+        Log.error("Error publishing image: #{error}")
         :error
     end
   end
