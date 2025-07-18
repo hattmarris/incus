@@ -40,6 +40,13 @@ defmodule Incus do
     |> Req.new()
   end
 
+  def cert!(opts \\ []) do
+    case Incus.new(opts) |> Req.get() do
+      {:ok, %Req.Response{body: %{"metadata" => %{"environment" => environment}}}} ->
+        environment["certificate"]
+    end
+  end
+
   @type resp_t :: {:ok, Req.Response.t() | map} | {:error, Req.Response.t() | String.t()}
   @spec handle(tuple, Endpoint.t(), list) :: resp_t
   def handle(resp_tuple, %Endpoint{} = endpoint, opts \\ []) do

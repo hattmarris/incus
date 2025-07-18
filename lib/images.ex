@@ -1,6 +1,56 @@
 defmodule Incus.Images do
   alias Incus.Endpoint
+  alias Incus.Log
+  alias Incus.Operations
 
+  @doc """
+  Copy images between servers
+  """
+  def copy(image, opts \\ []) do
+    remote = Keyword.get(opts, :remote)
+    image_name = to_string(image)
+
+    {:ok, images} = get(recursion: 1)
+    image = Enum.find(images, fn i -> Enum.find(i["aliases"], &(&1["name"] == image_name)) end)
+
+    if image do
+      body = %{
+        "source" => %{
+          "mode" => "push",
+          "fingerprint" => image["fingerprint"]
+        }
+      }
+
+      {:ok, %{"metadata" => metadata}} = post(body, opts ++ [server: :remote])
+
+      {:ok, %Req.Response{body: %{"metadata" => %{"id" => id}}}} =
+        post_export(image["fingerprint"],
+          certificate: Incus.cert!(server: :remote),
+          target: remote,
+          secret: metadata["secret"],
+          server: :local
+        )
+
+      case Operations.wait(id) do
+        {:ok, %Req.Response{body: %{"status_code" => 200}}} ->
+          # Adding aliases in export call doesnt work, adds separate call
+          {:ok, _} = post_aliases(image["fingerprint"], image_name, server: :remote)
+          {:ok, "Image copied successfully!"}
+
+        {:ok, %Req.Response{body: %{"error" => error}}} ->
+          Log.error(error)
+          {:error, "Error copying image"}
+      end
+    else
+      {:error, "no image found"}
+    end
+  end
+
+  @doc """
+  POST /1.0/images Add an image
+
+  Adds a new image to the image store.
+  """
   def post(body, opts \\ []) do
     endpoint = %Endpoint{method: "POST", version: "1.0", path: "/images"}
 
@@ -70,6 +120,34 @@ defmodule Incus.Images do
     |> Incus.handle(endpoint, opts)
   end
 
+  def post_export(fingerprint, opts \\ []) do
+    endpoint = %Endpoint{
+      method: "POST",
+      version: "1.0",
+      path: "/images/#{fingerprint}/export"
+    }
+
+    certificate = Keyword.get(opts, :certificate)
+    secret = Keyword.get(opts, :secret)
+    target = Keyword.get(opts, :target)
+
+    body = %{
+      "target" => target,
+      "secret" => secret,
+      "certificate" => certificate,
+      "aliases" => [
+        %{
+          "name" => "light-app",
+          "description" => ""
+        }
+      ]
+    }
+
+    opts
+    |> Incus.new()
+    |> Req.post(url: endpoint.path, body: Jason.encode!(body))
+  end
+
   def delete(fingerprint, opts \\ []) do
     endpoint = %Endpoint{
       method: "DELETE",
@@ -116,6 +194,25 @@ defmodule Incus.Images do
         paths
       end
     end)
+  end
+
+  def post_aliases(fingerprint, name, opts \\ []) do
+    endpoint = %Endpoint{
+      method: "POST",
+      version: "1.0",
+      path: "/images/aliases"
+    }
+
+    body =
+      %{
+        "target" => fingerprint,
+        "name" => name
+      }
+
+    opts
+    |> Incus.new()
+    |> Req.post(url: endpoint.path, body: Jason.encode!(body))
+    |> Incus.handle(endpoint, opts)
   end
 
   def rename_alias(from, to, opts \\ []) do
