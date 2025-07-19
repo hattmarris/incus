@@ -159,8 +159,10 @@ defmodule Incus do
       %{
         name: name,
         config: Keyword.get(opts, :config),
+        devices: Keyword.get(opts, :devices),
         source: source,
-        type: Keyword.get(opts, :type, :container)
+        type: Keyword.get(opts, :type, :container),
+        start: true
       }
       |> Map.reject(fn {_k, v} -> is_nil(v) end)
       |> Log.debug()
@@ -168,8 +170,9 @@ defmodule Incus do
 
     Log.info("Creating instance")
 
-    case await_create(id, Keyword.take(opts, [:timeout])) do
-      :ok -> start(name)
+    case await_create(id, Keyword.take(opts, [:timeout, :server])) do
+      # :ok -> start(name, Keyword.take(opts, [:server]))
+      :ok -> Log.info("Instance started")
       :error -> :error
     end
   end
