@@ -181,12 +181,19 @@ defmodule Incus do
     end
   end
 
-  def exec(name, cmd_str, opts \\ []) do
-    command =
+  def exec(name, cmd, opts \\ [])
+
+  def exec(name, "" <> cmd_str, opts) do
+    cmd_list =
       cmd_str
       |> String.split(" ")
       |> Enum.map(&String.trim(&1))
-      |> Log.debug()
+
+    exec(name, cmd_list, opts)
+  end
+
+  def exec(name, cmd_list, opts) when is_list(cmd_list) do
+    command = cmd_list |> Log.debug()
 
     body =
       %{
@@ -203,7 +210,7 @@ defmodule Incus do
         "cwd" => Keyword.get(opts, :cwd, "")
       }
 
-    Instances.exec(name, body)
+    Instances.exec(name, body, opts)
   end
 
   def file_pull(name, instance_path, local_path, opts \\ []) do
