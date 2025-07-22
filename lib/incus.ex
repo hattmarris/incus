@@ -172,8 +172,12 @@ defmodule Incus do
 
     case await_create(id, Keyword.take(opts, [:timeout, :server])) do
       # :ok -> start(name, Keyword.take(opts, [:server]))
-      :ok -> Log.info("Instance started")
-      :error -> :error
+      :ok ->
+        Log.info("Instance started")
+        :ok
+
+      :error ->
+        :error
     end
   end
 
