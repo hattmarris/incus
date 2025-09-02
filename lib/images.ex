@@ -31,7 +31,7 @@ defmodule Incus.Images do
           server: :local
         )
 
-      case Operations.wait(id) do
+      case Operations.wait(id, opts) do
         {:ok, %Req.Response{body: %{"status_code" => 200}}} ->
           # Adding aliases in export call doesnt work, adds separate call
           {:ok, _} = post_aliases(image["fingerprint"], image_name, server: :remote)
