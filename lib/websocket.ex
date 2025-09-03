@@ -85,7 +85,9 @@ defmodule Incus.Websocket do
     Log.debug("[#{state.name}] #{msg}")
   end
 
-  def url(id, secret) do
-    "wss://127.0.0.1:9443/1.0/operations/#{id}/websocket?secret=#{secret}"
+  def url(id, secret, opts) do
+    address = Incus.https_address!(opts)
+
+    "wss://#{address}/1.0/operations/#{id}/websocket?secret=#{secret}"
   end
 end

@@ -31,6 +31,13 @@ defmodule Incus do
     |> Req.new()
   end
 
+  def https_address!(opts) do
+    case Incus.new(opts) |> Req.get() do
+      {:ok, %Req.Response{body: %{"metadata" => %{"config" => config}}}} ->
+        config["core.https_address"]
+    end
+  end
+
   def cert!(opts \\ []) do
     case Incus.new(opts) |> Req.get() do
       {:ok, %Req.Response{body: %{"metadata" => %{"environment" => environment}}}} ->
@@ -186,20 +193,19 @@ defmodule Incus do
   def exec(name, cmd_list, opts) when is_list(cmd_list) do
     command = cmd_list |> Log.debug()
 
-    body =
-      %{
-        "command" => command,
-        "wait-for-websocket" => true,
-        "interactive" => true,
-        "environment" => %{
-          "TERM" => "xterm-256color"
-        },
-        "width" => 102,
-        "height" => 54,
-        "user" => 0,
-        "group" => 0,
-        "cwd" => Keyword.get(opts, :cwd, "")
-      }
+    body = %{
+      "command" => command,
+      "wait-for-websocket" => true,
+      "interactive" => true,
+      "environment" => %{
+        "TERM" => "xterm-256color"
+      },
+      "width" => 102,
+      "height" => 54,
+      "user" => 0,
+      "group" => 0,
+      "cwd" => Keyword.get(opts, :cwd, "")
+    }
 
     Instances.exec(name, body, opts)
   end
@@ -230,8 +236,7 @@ defmodule Incus do
 
         case Incus.Instances.head_files(name, i_path, opts) do
           {:ok, %Req.Response{headers: %{"x-incus-type" => ["file"]}}} ->
-            resp =
-              single_file_pull(name, i_path, path, opts)
+            resp = single_file_pull(name, i_path, path, opts)
 
             acc ++ [{:file, file, resp}]
 
@@ -280,8 +285,7 @@ defmodule Incus do
 
         case File.lstat!(path) do
           %File.Stat{type: :regular} ->
-            resp =
-              single_file_push(name, path, i_path, opts)
+            resp = single_file_push(name, path, i_path, opts)
 
             acc ++ [{:file, file, resp}]
 

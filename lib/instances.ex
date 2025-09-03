@@ -93,7 +93,7 @@ defmodule Incus.Instances do
              "fds" => %{"0" => main, "control" => control}
            }
          }} ->
-          {Websocket.url(id, main), Websocket.url(id, control)}
+          {Websocket.url(id, main, opts), Websocket.url(id, control, opts)}
       end
 
     timeout = Keyword.get(opts, :timeout, 60000)
