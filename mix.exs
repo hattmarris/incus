@@ -5,15 +5,15 @@ defmodule Incus.MixProject do
     [
       app: :incus,
       version: "0.1.0",
-      elixir: "~> 1.18",
+      elixir: "~> 1.20",
       deps: deps()
     ]
   end
 
   defp deps do
     [
-      {:req, "~> 0.5.6"},
-      {:websockex, "~> 0.4.3"}
+      {:req, "~> 0.7.5"},
+      {:websockex, "~> 0.5.1"}
     ]
   end
 end
